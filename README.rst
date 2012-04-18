@@ -6,3 +6,4 @@ mudar o default do valor do campo type tmb?
 
 colocar o campo type no 'pai' automaticamente(heranca ou decorator), e onde o campo teria o nome como:
 __class__.__name__+_type
+
