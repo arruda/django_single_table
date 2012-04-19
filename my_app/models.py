@@ -1,26 +1,29 @@
 from django.db import models
 from model_utils import Choices
-from factory import manager_factory, proxy_factory
-
-
+from factory import manager_factory, proxy_factory, proxy_many_to_many_factory
 
 class Foo(models.Model):
     "The single table model"
+
     TYPE_CHOICES = Choices(
                            (0,'foo','Foo'),
                            (1,'foo1','Foo1'),
                            (2,'foo2','Foo2'),
                            )
+
     
-    type = models.SmallIntegerField(choices=TYPE_CHOICES,default=TYPE_CHOICES.foo)
+    type = models.SmallIntegerField(choices=TYPE_CHOICES,default=0)
     
+    def get_fields(self):
+    # make a list of field/values.
+        dct={}
+        for field in self.__class__._meta.fields:
+            dct[field.attname] = field.value_to_string(self)
+        return dct
     
     def __unicode__(self):
         return "%s - %s" %(self.pk,self.type)
 
-for proxy_model in Foo.TYPE_CHOICES:
-    exec(manager_factory(proxy_model[1], 'type', proxy_model[0]))
-    exec(proxy_factory(proxy_model[1], 'Foo', 'type', proxy_model[0]))
 
 #exec(manager_factory('Foo1', 'type', 1))
 #exec(proxy_factory('Foo1', 'Foo', 'type', 1))
@@ -66,30 +69,57 @@ class FooBar(models.Model):
                            (1,'foo1','Foo1'),
                            (2,'foo2','Foo2'),
                            )
-    foo = models.ForeignKey(Foo)
-    bar = models.ForeignKey(Bar)
-    type = models.SmallIntegerField(choices=TYPE_CHOICES,default=TYPE_CHOICES.foo)
+    type = models.SmallIntegerField(choices=TYPE_CHOICES,default=0)
+    foo = models.ForeignKey(Foo,related_name="%(class)s_list")
+    bar = models.ForeignKey(Bar,related_name="%(class)s_list")
     
+    
+        
+        
     def __unicode__(self):
         return "%s - %s - %s" %(self.pk, self.foo, self.bar)
     
+class TypeAwareManager(models.Manager):
     
-class Foo1BarManager(models.Manager):
-        
+    def __init__(self,type_field, type, *args, **kwargs):
+        super(TypeAwareManager, self).__init__(*args, **kwargs)
+        self.type = type
+        self.type_field = type_field
+    
     def get_query_set(self):
-        return super(Foo1BarManager, self).get_query_set().filter(type=1)
-    
-    
-class Foo1Bar(FooBar):
-    
-    objects = Foo1BarManager()
-    class Meta:
-        proxy= True
-        
-    def save(self, *args, **kwargs):
-        self.type = 1
-        super(Foo1Bar, self).save(*args, **kwargs)
+#        dct = {self.type_field:self.type}
+#        print dct
+        return super(TypeAwareManager, self).get_query_set().filter(**{self.type_field:self.type})
 
-setattr(Bar,'foo1s',models.ManyToManyField(Foo1,through=Foo1Bar))
+for proxy_model in Foo.TYPE_CHOICES[1:]:
+#    print proxy_model
+    #:proxy_model
+    exec(proxy_factory(proxy_model[1], 'Foo', 'type', proxy_model[0]))
+    #:proxy_model_many_to_many_manager
+    exec(manager_factory(proxy_model[1]+'Bar', proxy_model[1].lower(), proxy_model[0]))
+    #:proxy_model_many_to_many
+    exec(proxy_many_to_many_factory(proxy_model[1],'Bar', 'FooBar','type', proxy_model[0]))
+    #add o many-to-many field no proxy model
+    setattr(Bar,proxy_model[1]+'Bar',models.ManyToManyField(vars()[proxy_model[1]],through=vars()[proxy_model[1]+'Bar']))
+    
+    
+    
+#class Foo1BarManager(models.Manager):
+#        
+#    def get_query_set(self):
+#        return super(Foo1BarManager, self).get_query_set().filter(type=1)
+#    
+#    
+#class Foo1Bar(FooBar):
+#    
+#    objects = Foo1BarManager()
+#    class Meta:
+#        proxy= True
+#        
+#    def save(self, *args, **kwargs):
+#        self.type = 1
+#        super(Foo1Bar, self).save(*args, **kwargs)
+#
+#setattr(Bar,'foo1s',models.ManyToManyField(Foo1,through=Foo1Bar))
 #setattr(Bar,'foo1s',models.ManyToManyField(Foo1,through=Foo1Bar))
     

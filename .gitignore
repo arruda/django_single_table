@@ -2,4 +2,4 @@
 .project
 .pydevproject
 .settings/
-db.sqlit
+db.sqlite
