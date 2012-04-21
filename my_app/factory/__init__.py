@@ -25,7 +25,7 @@ class %(CLASS_NAME)s(%(SUPER_CLASS)s):
         
     objects = TypeAwareManager('%(TYPE_FIELD)s',%(TYPE)s)
     
-    def __cast_from(self,instance):
+    def __cast_from(self,super_instance):
         for k,v in instance.get_fields().items():
             if k in self.get_fields():
                 self.__setattr__(k,v)
@@ -34,8 +34,9 @@ class %(CLASS_NAME)s(%(SUPER_CLASS)s):
     def __init__(self, *args, **kwargs):        
         super(%(CLASS_NAME)s, self).__init__(*args, **kwargs)
         #:cast
-        if isinstance(args[0],%(SUPER_CLASS)s):
-            self.__cast_from(args[0])
+        if args != ():
+            if isinstance(args[0],%(SUPER_CLASS)s):
+                self.__cast_from(args[0])
         self.%(TYPE_FIELD)s = %(TYPE)s
 
     class Meta:
@@ -52,11 +53,20 @@ MANY_TO_MANY_TEMPLATE =\
 class %(CLASS_A_NAME)s%(CLASS_B_NAME)s (%(SUPER_CLASS)s):
     
     objects = TypeAwareManager('%(TYPE_FIELD)s',%(TYPE)s)
+    
     class Meta:
         proxy= True
         
 """
 
+def link_to_many_to_many_factory(cls,model_field,link_class):
+    def link(self):
+        print link_class.__name__
+        return link_class.objects.filter(**{model_field : self})
+
+    setattr(cls,link_class.__name__.lower()+"_list", link)
+    return cls
+    
 def manager_factory(class_name,type_field_name,type):
     format_dict = {
                    'CLASS_NAME':class_name,

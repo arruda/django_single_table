@@ -1,7 +1,20 @@
 from django.db import models
 from model_utils import Choices
-from factory import manager_factory, proxy_factory, proxy_many_to_many_factory
+from factory import manager_factory, proxy_factory, proxy_many_to_many_factory, link_to_many_to_many_factory
+from utils import replace_on_cast
 
+class TypeAwareManager(models.Manager):
+    
+    def __init__(self,type_field, type, *args, **kwargs):
+        super(TypeAwareManager, self).__init__(*args, **kwargs)
+        self.type = type
+        self.type_field = type_field
+    
+    def get_query_set(self):
+#        dct = {self.type_field:self.type}
+#        print dct
+        return super(TypeAwareManager, self).get_query_set().filter(**{self.type_field:self.type})
+  
 class Foo(models.Model):
     "The single table model"
 
@@ -11,8 +24,8 @@ class Foo(models.Model):
                            (2,'foo2','Foo2'),
                            )
 
-    
     type = models.SmallIntegerField(choices=TYPE_CHOICES,default=0)
+    
     
     def get_fields(self):
     # make a list of field/values.
@@ -79,17 +92,6 @@ class FooBar(models.Model):
     def __unicode__(self):
         return "%s - %s - %s" %(self.pk, self.foo, self.bar)
     
-class TypeAwareManager(models.Manager):
-    
-    def __init__(self,type_field, type, *args, **kwargs):
-        super(TypeAwareManager, self).__init__(*args, **kwargs)
-        self.type = type
-        self.type_field = type_field
-    
-    def get_query_set(self):
-#        dct = {self.type_field:self.type}
-#        print dct
-        return super(TypeAwareManager, self).get_query_set().filter(**{self.type_field:self.type})
 
 for proxy_model in Foo.TYPE_CHOICES[1:]:
 #    print proxy_model
@@ -98,11 +100,17 @@ for proxy_model in Foo.TYPE_CHOICES[1:]:
     #:proxy_model_many_to_many_manager
     exec(manager_factory(proxy_model[1]+'Bar', proxy_model[1].lower(), proxy_model[0]))
     #:proxy_model_many_to_many
-    exec(proxy_many_to_many_factory(proxy_model[1],'Bar', 'FooBar','type', proxy_model[0]))
+    exec(proxy_many_to_many_factory(proxy_model[1],'Bar', 'FooBar','foo__type', proxy_model[0]))
+    many = vars().get(proxy_model[1]+'Bar')
+
+    #: adds methods to access foo chields from bar.
+    Bar = link_to_many_to_many_factory(Bar,'bar', many)
+#    setattr(Bar,(proxy_model[1]+'Bar').lower(), link_to_many_to_may_factory(model_field, link_class, type_field, type))
     #add o many-to-many field no proxy model
-    setattr(Bar,proxy_model[1]+'Bar',models.ManyToManyField(vars()[proxy_model[1]],through=vars()[proxy_model[1]+'Bar']))
+#    setattr(Bar,proxy_model[1]+'Bar',models.ManyToManyField(vars()[proxy_model[1]],through=vars()[proxy_model[1]+'Bar']))
     
-    
+
+
     
 #class Foo1BarManager(models.Manager):
 #        
