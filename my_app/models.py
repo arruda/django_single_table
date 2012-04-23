@@ -35,8 +35,7 @@ class Foo1(Foo):
     def __cast_from(self,super_instance):
         #change this instance fields for the super_instance one
         #but only the ones that matter.
-        
-        pass
+        self.pk = super_instance.pk
 
     
     def __init__(self, *args, **kwargs):        
@@ -73,14 +72,38 @@ class FooBar(models.Model):
 
 class Foo1Bar(FooBar):
     
-    objects = TypeAwareManager('foo_type',1)
+    objects = TypeAwareManager('foo__type',1)
     
     class Meta:
         proxy= True
+        
+def change_fb(cls):
+    old_foo = cls.foo
+    
+    def get_foo(self):
+        return Foo1(self.old_foo) if self.old_foo != None else None
+    
+    def set_foo(self,foo):
+        self.old_foo = foo
+    
+    new_foo =  property(get_foo, set_foo)
+    
+    setattr(cls, 'old_foo', old_foo)
+    setattr(cls, 'foo', new_foo)
+    
+    return cls
+    
+Foo1Bar = change_fb(Foo1Bar)
     
 class Bar(models.Model):
     "a class that has connection to other proxies"
-    foos = models.ManyToManyField('my_app.Foo1',related_name='bars_list',through='my_app.Foo1Bar')
+    foos = models.ManyToManyField('my_app.Foo',related_name='bars_list',through='my_app.FooBar')
+    
+    @property
+    def foo1bar_list(self):
+        qr = self.foobar_list.filter(foo__type=1)
+        qr.model = Foo1Bar
+        return qr
     
     def __unicode__(self):
         return "%s" %(self.pk)
